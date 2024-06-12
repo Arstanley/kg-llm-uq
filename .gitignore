@@ -8,3 +8,6 @@ llamas/
 wandb/
 train.hf/
 train_webqsp_0.1.hf
+*.pkl
+/saved_models
+/results

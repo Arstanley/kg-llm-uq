@@ -1,0 +1,12 @@
+# data config
+dataset_dir: /home/bo/Dropbox/Projects/kg-llm-uq/data
+dataset_name: webqsp_path_based
+output_path: /home/bo/Dropbox/Projects/kg-llm-uq/results
+partition: test
+
+# Graph traversal configs
+similarity_method: transformer
+generation_method: concatenation
+
+
+
