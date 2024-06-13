@@ -5,7 +5,7 @@ from transformers import pipeline
 import torch
 from qa import split_trainset
 
-dataset_name = 'cwq'
+dataset_name = 'webqsp'
 
 LLAMA_MODEL = 'meta-llama/Llama-2-7b-chat-hf' # Can use pretrain in the future
 # generator = pipeline('text-generation', model=LLAMA_MODEL, torch_dtype=torch.float16, device=0)
