@@ -3,7 +3,6 @@ calibrated_scores_legacy/
 *conflicted*
 data
 legacy/
-llamas/
 *.out
 wandb/
 train.hf/
