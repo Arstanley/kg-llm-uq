@@ -1,10 +1,8 @@
-baselines/
 calibrated_scores_legacy/
 *conflicted*
 legacy/
 *.out
 data/
-baselines/
 wandb/
 train.hf/
 train_webqsp_0.1.hf
