@@ -52,7 +52,7 @@ def batch_data(data_generator, batch_size):
 
 def generate_with_logits(model, tokenizer, batch, temperature=1, max_new_tokens=5):
     inputs = tokenizer(batch, return_tensors='pt', padding=True)
-    inputs = {key: value.to('cuda') for key, value in inputs.items()}  # Ensure inputs are on GPU if available
+    inputs = {key: value.to(distributed_state.device) for key, value in inputs.items()}  # Ensure inputs are on GPU if available
     with torch.cuda.amp.autocast():
         with torch.no_grad():
             output = model.generate(
