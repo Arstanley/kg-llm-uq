@@ -123,22 +123,29 @@ def main():
     print("Alpha Space: ", len(combinations))
     
     # Load p_values from disk if it exists, otherwise calculate it and save it
-    p_values_path = f"./p_values_{args.dataset_name}.pkl"
+    p_values_path = f"./p_values_{args.dataset_name}.json"
     if os.path.isfile(p_values_path):
-        p_values = pkl.load(open(p_values_path, "rb"))
+        with open(p_values_path, "r") as f:
+            p_values_tmp = json.load(f)
+        p_values = np.array(p_values_tmp["p_values"])
+        combinations_idx = p_values_tmp["combinations_idx"]
     else:
         p_values = [] # This will be a 2d array, each row will be the p_values for a combination. We include every epsilon in the p_values.
-        for combination in tqdm(combinations):
-            print(combination)
-            alpha1 = combination[0]
-            alpha2 = combination[1]
-            alpha3 = combination[2]
-
-            current_p_values = get_p_values(combination, cp_model, caliberation_dataset.select(range(150)), epsilons, fout) 
-            p_values.append(current_p_values)
+        combinations_idx = 0
         
-        pkl.dump(p_values, open(p_values_path, "wb"))
+    for combination in tqdm(combinations[combinations_idx:]):
+        alpha1 = combination[0]
+        alpha2 = combination[1]
+        alpha3 = combination[2]
 
+        current_p_values = get_p_values(combination, cp_model, caliberation_dataset.select(range(150)), epsilons, fout) 
+        p_values.append(current_p_values)
+        
+        with open(p_values_path, "w") as f:
+            json.dump({"p_values": p_values.tolist(), "combinations_idx": combinations_idx}, f)
+        
+        combinations_idx += 1
+        
     p_values = np.array(p_values)
 
     # Check if the object exist, if not, then run the code and save it.
