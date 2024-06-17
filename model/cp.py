@@ -488,10 +488,7 @@ class ConformalPredictor:
             # In additional to the gt paths, let's also add the predicted paths from ROG for better claibration
 
             # Now, we will use the pre-trained llm as the logit calculator 
-            with disributed_state.split_between_processes(a_entities, applying_padding=True):
-                # TODO 
-                a_entities = 
-                _, logits = generate_with_logits(model, tokenizer, a_entities)
+            _, logits = generate_with_logits(model, tokenizer, a_entities)
             # logits is of shape (max_len, len(a_entities) aka batch size, vocab_size)
             no_token = tokenizer("No")['input_ids'][1]
             
