@@ -53,17 +53,15 @@ def batch_data(data_generator, batch_size):
 def generate_with_logits(model, tokenizer, batch, temperature=1, max_new_tokens=5):
     inputs = tokenizer(batch, return_tensors='pt', padding=True)
     inputs = {key: value.to(distributed_state.device) for key, value in inputs.items()}  # Ensure inputs are on GPU if available
-    with torch.cuda.amp.autocast():
-        with torch.no_grad():
-            output = model.generate(
-                input_ids=inputs['input_ids'], 
-                attention_mask=inputs['attention_mask'], 
-                temperature=temperature, 
-                max_new_tokens=max_new_tokens, 
-                num_return_sequences=1, 
-                output_scores=True, 
-                return_dict_in_generate=True
-            )
+    output = model.generate(
+        input_ids=inputs['input_ids'], 
+        attention_mask=inputs['attention_mask'], 
+        temperature=temperature, 
+        max_new_tokens=max_new_tokens, 
+        num_return_sequences=1, 
+        output_scores=True, 
+        return_dict_in_generate=True
+    )
     generated_tokens = output.sequences
     logits = output['scores']
 
