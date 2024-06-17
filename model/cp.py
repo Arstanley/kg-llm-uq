@@ -7,7 +7,7 @@ import heapq
 from collections import defaultdict 
 import random
 import torch
-from acclerate.utils import gather_object
+from accelerate.utils import gather_object
 from accelerate import PartialState
 
 from torch.nn.parallel import DistributedDataParallel as DDP
