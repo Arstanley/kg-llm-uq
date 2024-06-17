@@ -367,7 +367,6 @@ class ConformalPredictor:
         with distributed_state.split_between_processes(batch_data_generator, apply_padding="True") as batched_data_generator:
             for batch, batch_answers in batched_data_generator:
                 # Here the logits will have shape (max_generation_length, batch_size, vocab_size)
-                batch = batch.to(distributed_state.device)
                 generated_text, logits = generate_with_logits(model, tokenizer, batch)
                 first_token_logit = logits[0]
                 yes_token = tokenizer("Yes")['input_ids'][1]
