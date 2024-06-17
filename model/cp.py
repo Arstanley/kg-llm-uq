@@ -7,6 +7,7 @@ import heapq
 from collections import defaultdict 
 import random
 import torch
+from acclerate.utils import gather_object
 from accelerate import PartialState
 
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -360,26 +361,25 @@ class ConformalPredictor:
 
         final_answer = []
         batch_data_generator = batch_data(cal_data(), batch_size=12)
-        for batch, batch_answers in batch_data_generator:
-            # Here the logits will have shape (max_generation_length, batch_size, vocab_size)
-            generated_text, logits = generate_with_logits(model, tokenizer, batch)
-            first_token_logit = logits[0]
-            yes_token = tokenizer("Yes")['input_ids'][1]
-            no_token = tokenizer("No")['input_ids'][1]
-            yes_logit = first_token_logit[:, yes_token]
-            no_logit = first_token_logit[:, no_token]
+        all_final_answers = []
+        with distributed_state.split_between_processes(batch_data_generator, applying_padding="True") as batched_data_generator:
+            for batch, batch_answers in batched_data_generator:
+                # Here the logits will have shape (max_generation_length, batch_size, vocab_size)
+                batch = batch.to(distributed_state.device)
+                generated_text, logits = generate_with_logits(model, tokenizer, batch)
+                first_token_logit = logits[0]
+                yes_token = tokenizer("Yes")['input_ids'][1]
+                no_token = tokenizer("No")['input_ids'][1]
+                yes_logit = first_token_logit[:, yes_token]
+                no_logit = first_token_logit[:, no_token]
 
-            selected_answers = select_answers_with_no_logit_below_threshold(no_logit, batch_answers, self.q_hats_post_rank)
+                selected_answers = select_answers_with_no_logit_below_threshold(no_logit, batch_answers, self.q_hats_post_rank)
 
-            final_answer += selected_answers
-        # for answer in answers:
-        #     reasoning_path = [p for p in reasoning_paths if p.split("->")[-1].lower().strip() == answer.lower().strip()]
-        #     input = question
+                all_final_answers.append(selected_answers)
 
-        #     softmax_scores = self.ranker.get_softmax_score(input, answers, reasoning_paths)
-        #     if softmax_scores[1] <= self.q_hats_post_rank:
-        #         final_answer.append((answer, reasoning_path))
-
+        print(all_final_answers)
+        # Gather all the results from all processes
+        final_answer = gather_object(all_final_answers)
         return final_answer
 
     def calculate_score(self, tgt_sentences, cur_sentence):
@@ -488,7 +488,10 @@ class ConformalPredictor:
             # In additional to the gt paths, let's also add the predicted paths from ROG for better claibration
 
             # Now, we will use the pre-trained llm as the logit calculator 
-            _, logits = generate_with_logits(model, tokenizer, a_entities)
+            with disributed_state.split_between_processes(a_entities, applying_padding=True):
+                # TODO 
+                a_entities = 
+                _, logits = generate_with_logits(model, tokenizer, a_entities)
             # logits is of shape (max_len, len(a_entities) aka batch size, vocab_size)
             no_token = tokenizer("No")['input_ids'][1]
             
