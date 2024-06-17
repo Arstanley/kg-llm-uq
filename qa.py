@@ -117,13 +117,13 @@ def main():
     # 1 ) Get the search space for the alphas 
     alpha1 = np.arange(0.1, 1, 0.3)
     alpha2 = np.arange(0.1, 1, 0.2)
-    alpha3 = np.arange(0.1, 1, 0.2)
+    alpha3 = np.arange(0.1, 1, 0.1)
     search_spaces = {"alpha1": alpha1, "alpha2": alpha2, "alpha3": alpha3}
     combinations = list(product(*search_spaces.values()))
     print("Alpha Space: ", len(combinations))
     
     # Load p_values from disk if it exists, otherwise calculate it and save it
-    p_values_path = "./p_values.pkl"
+    p_values_path = f"./p_values_{args.dataset_name}.pkl"
     if os.path.isfile(p_values_path):
         p_values = pkl.load(open(p_values_path, "rb"))
     else:
@@ -140,10 +140,9 @@ def main():
         pkl.dump(p_values, open(p_values_path, "wb"))
 
     p_values = np.array(p_values)
-    print(p_values.shape)
 
     # Check if the object exist, if not, then run the code and save it.
-    rejected_combinations_for_epsilon_path = "./rejected_combinations_for_epsilon.pkl"
+    rejected_combinations_for_epsilon_path = f"./rejected_combinations_for_epsilon_{args.dataset_name}.pkl"
     if not os.path.isfile(rejected_combinations_for_epsilon_path):
         # Get the rejected combinations for each epsilon
         rejected_combinations_for_epsilon = []
@@ -195,6 +194,7 @@ def run_cp_model_on_dataset(dataset, cp_model, fout):
         
         try:
             final_answers = cp_model.predict(q_entity, graph, question, question_id)
+            print(final_answers)
 
             # Create dict to store prediction
             res = {"id": data['id'], "question": question, "final_answers": final_answers, "a_entity": a_entity}
@@ -203,7 +203,7 @@ def run_cp_model_on_dataset(dataset, cp_model, fout):
 
             total_length += (len(final_answers) / len(a_entity))
 
-            answer_set = [ii[0] for ii in final_answers]
+            answer_set = final_answers 
             correct += len([0 for a in a_entity if a.lower().strip() in answer_set]) / len(a_entity)
             hits_at_1 += any(a.lower().strip() in answer_set for a in a_entity)
              
@@ -223,7 +223,8 @@ def get_p_values(configuration, cp_model, calibration_set, epsilon, fout):
     cp_model.set_alpha(configuration)
     _, _, hits_at_1 = run_cp_model_on_dataset(calibration_set, cp_model, fout)
     R = (len(calibration_set) - hits_at_1) # Risk level
-    
+    print(R, len(calibration_set), epsilon)
+
     p_values = [] 
     for epsilon in epsilons:
         p_value = stats.binom.cdf(R, len(calibration_set), epsilon)

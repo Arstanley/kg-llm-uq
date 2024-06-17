@@ -8,6 +8,8 @@ from collections import defaultdict
 import random
 import torch
 
+from torch.nn.parallel import DistributedDataParallel as DDP
+
 from sentence_transformers import SentenceTransformer
 sys.path.append(os.path.dirname(os.path.realpath(__file__)) + "/..")
 from utils import graph_utils
@@ -29,7 +31,9 @@ model = LlamaForCausalLM.from_pretrained(
     "meta-llama/Meta-Llama-3-8B-Instruct",
     load_in_8bit=False,
     torch_dtype=torch.float16
-).bfloat16().cuda()
+).bfloat16()
+
+model.to('cuda')
 
 def batch_data(data_generator, batch_size):
     batch = []
@@ -47,15 +51,17 @@ def batch_data(data_generator, batch_size):
 def generate_with_logits(model, tokenizer, batch, temperature=1, max_new_tokens=5):
     inputs = tokenizer(batch, return_tensors='pt', padding=True)
     inputs = {key: value.to('cuda') for key, value in inputs.items()}  # Ensure inputs are on GPU if available
-    output = model.generate(
-        input_ids=inputs['input_ids'], 
-        attention_mask=inputs['attention_mask'], 
-        temperature=temperature, 
-        max_new_tokens=max_new_tokens, 
-        num_return_sequences=1, 
-        output_scores=True, 
-        return_dict_in_generate=True
-    )
+    with torch.cuda.amp.autocast():
+        with torch.no_grad():
+            output = model.generate(
+                input_ids=inputs['input_ids'], 
+                attention_mask=inputs['attention_mask'], 
+                temperature=temperature, 
+                max_new_tokens=max_new_tokens, 
+                num_return_sequences=1, 
+                output_scores=True, 
+                return_dict_in_generate=True
+            )
     generated_tokens = output.sequences
     logits = output['scores']
 
@@ -161,9 +167,9 @@ class ConformalPredictor:
 
     def _init_scores(self):
         if self.calibrate_with_reasoing_paths == False:
-            scores_path = f'/home/bo/Dropbox/Projects/kg-llm-uq/calibrated_scores/{self.dataset}_{self.ranker.isPretrained()}_scores_path.pkl'
-            scores_a = f'/home/bo/Dropbox/Projects/kg-llm-uq/calibrated_scores/{self.dataset}_{self.ranker.isPretrained()}_scores_a.pkl'
-            scores_candidate = f'/home/bo/Dropbox/Projects/kg-llm-uq/calibrated_scores/{self.dataset}_{self.ranker.isPretrained()}_scores_candidate.pkl'
+            scores_path = f'/home/bo/Dropbox/Projects/kg-llm-uq/calibrated_scores/{self.dataset}_scores_path.pkl'
+            scores_a = f'/home/bo/Dropbox/Projects/kg-llm-uq/calibrated_scores/{self.dataset}_scores_a.pkl'
+            scores_candidate = f'/home/bo/Dropbox/Projects/kg-llm-uq/calibrated_scores/{self.dataset}_scores_candidate.pkl'
             if (os.path.isfile(scores_path) and os.path.isfile(scores_a) and os.path.isfile(scores_candidate)):
                 self.path_scores = pkl.load(open(scores_path, 'rb'))
                 self.ans_scores = pkl.load(open(scores_a, 'rb'))
@@ -333,9 +339,10 @@ class ConformalPredictor:
 
                 system_message = "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe.  Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature. If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information."
                 user_message = f"""Is "{answer}" an answer to "{question}?" given the following reasoning paths: {paths_str} Answer with 'Yes' or 'No' only. DO NOT output anything else."""
-                while len(user_message) > 10000 and i < len():
+                while len(user_message) > 10000 and i < len(reasoning_path):
                     path_str = "[" + ','.join(reasoning_path[i:]) + "]"
                     user_message = f"""Is "{answer}" an answer to "{question}?" given the following reasoning paths: {path_str} Answer with 'Yes' or 'No' only. DO NOT output anything else."""
+                    i += 1
 
                 messages = [
         {"role": "system", "content": system_message},
@@ -353,7 +360,7 @@ class ConformalPredictor:
             return selected_answers
 
         final_answer = []
-        batch_data_generator = batch_data(cal_data(), batch_size=6)
+        batch_data_generator = batch_data(cal_data(), batch_size=12)
         for batch, batch_answers in batch_data_generator:
             # Here the logits will have shape (max_generation_length, batch_size, vocab_size)
             generated_text, logits = generate_with_logits(model, tokenizer, batch)
@@ -373,7 +380,6 @@ class ConformalPredictor:
         #     softmax_scores = self.ranker.get_softmax_score(input, answers, reasoning_paths)
         #     if softmax_scores[1] <= self.q_hats_post_rank:
         #         final_answer.append((answer, reasoning_path))
-        print(final_answer)
 
         return final_answer
 
@@ -496,18 +502,18 @@ class ConformalPredictor:
 
         self.max_hop = len(scores_path) if len(scores_path) < self.max_hop else self.max_hop
         if self.calibrate_with_reasoing_paths == False:
-            with open(f'/home/bo/Dropbox/Projects/kg-llm-uq/calibrated_scores/{self.dataset}_{self.ranker.isPretrained()}_scores_path.pkl', 'wb') as f1: # TODO: Do not hard-code the names. It should include dataset name and some relevant model configuration
+            with open(f'/home/bo/Dropbox/Projects/kg-llm-uq/calibrated_scores/{self.dataset}_scores_path.pkl', 'wb') as f1: # TODO: Do not hard-code the names. It should include dataset name and some relevant model configuration
                 pkl.dump(scores_path, f1)
-            with open(f'/home/bo/Dropbox/Projects/kg-llm-uq/calibrated_scores/{self.dataset}_{self.ranker.isPretrained()}_scores_a.pkl', 'wb') as f2:
+            with open(f'/home/bo/Dropbox/Projects/kg-llm-uq/calibrated_scores/{self.dataset}_scores_a.pkl', 'wb') as f2:
                 pkl.dump(scores_a, f2)
-            with open(f'/home/bo/Dropbox/Projects/kg-llm-uq/calibrated_scores/{self.dataset}_{self.ranker.isPretrained()}_scores_candidate.pkl', 'wb') as f3:
+            with open(f'/home/bo/Dropbox/Projects/kg-llm-uq/calibrated_scores/{self.dataset}_scores_candidate.pkl', 'wb') as f3:
                 pkl.dump(scores_candidate, f3)
         else:
-            with open(f'/home/bo/Dropbox/Projects/kg-llm-uq/calibrated_scores/{self.dataset}_{self.ranker.isPretrained()}_scores_path_rog.pkl', 'wb') as f1: # TODO: Do not hard-code the names. It should include dataset name and some relevant model configuration
+            with open(f'/home/bo/Dropbox/Projects/kg-llm-uq/calibrated_scores/{self.dataset}_scores_path_rog.pkl', 'wb') as f1: # TODO: Do not hard-code the names. It should include dataset name and some relevant model configuration
                 pkl.dump(scores_path, f1)
-            with open(f'/home/bo/Dropbox/Projects/kg-llm-uq/calibrated_scores/{self.dataset}_{self.ranker.isPretrained()}_scores_a_rog.pkl', 'wb') as f2:
+            with open(f'/home/bo/Dropbox/Projects/kg-llm-uq/calibrated_scores/{self.dataset}_scores_a_rog.pkl', 'wb') as f2:
                 pkl.dump(scores_a, f2)
-            with open(f'/home/bo/Dropbox/Projects/kg-llm-uq/calibrated_scores/{self.dataset}_{self.ranker.isPretrained()}_scores_candidate_rog.pkl', 'wb') as f3:
+            with open(f'/home/bo/Dropbox/Projects/kg-llm-uq/calibrated_scores/{self.dataset}_scores_candidate_rog.pkl', 'wb') as f3:
                 pkl.dump(scores_candidate, f3)
 
         return scores_path, scores_a, scores_candidate 
