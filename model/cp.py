@@ -7,6 +7,7 @@ import heapq
 from collections import defaultdict 
 import random
 import torch
+from accelerate import PartialState
 
 from torch.nn.parallel import DistributedDataParallel as DDP
 
@@ -33,7 +34,8 @@ model = LlamaForCausalLM.from_pretrained(
     torch_dtype=torch.float16
 ).bfloat16()
 
-model.to('cuda')
+distributed_state = PartialState()
+model.to(distributed_state.device)
 
 def batch_data(data_generator, batch_size):
     batch = []
@@ -175,8 +177,7 @@ class ConformalPredictor:
                 self.ans_scores = pkl.load(open(scores_a, 'rb'))
                 self.post_rank_score = pkl.load(open(scores_candidate, 'rb'))
             else:
-                print(2)
-                self.path_scores, self.ans_scores, self.post_rank_score = self.calibrate()
+                self.path_scores, self.ans_scores, self.post_rank_score = self.calculate_scores()
         else:
             scores_path = f'/home/bo/Dropbox/Projects/kg-llm-uq/calibrated_scores/{self.dataset}_False_scores_path_rog.pkl'
             scores_a = f'/home/bo/Dropbox/Projects/kg-llm-uq/calibrated_scores/{self.dataset}_False_scores_a_rog.pkl'
@@ -186,7 +187,7 @@ class ConformalPredictor:
                 self.ans_scores = pkl.load(open(scores_a, 'rb'))
                 self.post_rank_score = pkl.load(open(scores_candidate, 'rb'))
             else:
-                self.path_scores, self.ans_scores, self.post_rank_score = self.calibrate()
+                self.path_scores, self.ans_scores, self.post_rank_score = self.calculate_scores()
 
 
     def set_alpha(self, alpha):
@@ -408,7 +409,7 @@ class ConformalPredictor:
 
         return -cosine_similarity(emb1, emb2)
     
-    def calibrate(self):
+    def calculate_scores(self):
         """
         Calculate q_hats 
 
@@ -489,16 +490,12 @@ class ConformalPredictor:
             # In additional to the gt paths, let's also add the predicted paths from ROG for better claibration
 
             # Now, we will use the pre-trained llm as the logit calculator 
-            for a in a_entities:
-                # paths_for_a = [path for path in truth_paths if len(path) > 0 and path[-1][-1].lower().strip() == a.lower().strip()] # Target path 
-                # formatted_paths = []
-                # for path in paths_for_a:
-                #     # path is something like [(s, r, t), (s, r, t)]
-                #     formatted_paths.append(self.format_path(path))
-                # paths_in_prompt = "[" + ",".join(formatted_paths) + "]"
-                if self.ranker != None:  
-                    softmax_scores = self.ranker.get_softmax_score(question, a.lower().strip(), list_of_gt_paths) # Softmax for [class yes and class no]
-                    scores_candidate.append(softmax_scores[1].item()) # Use the 'no' score because we want the smaller the score the better the confidence
+            _, logits = generate_with_logits(model, tokenizer, a_entities)
+            # logits is of shape (max_len, len(a_entities) aka batch size, vocab_size)
+            no_token = tokenizer("No")['input_ids'][1]
+            
+            no_logit = logits[0, :, no_token]
+            scores_candidate.extend(no_logit.tolist())
 
         self.max_hop = len(scores_path) if len(scores_path) < self.max_hop else self.max_hop
         if self.calibrate_with_reasoing_paths == False:
