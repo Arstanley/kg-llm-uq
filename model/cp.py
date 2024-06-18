@@ -384,7 +384,7 @@ class ConformalPredictor:
             no_token = tokenizer("No")['input_ids'][1]
             yes_logit = first_token_logit[:, yes_token]
             no_logit = first_token_logit[:, no_token]
-            
+            print(batch_answers)
             batch_answers = accelerator.gather(batch_answers)
 
             selected_answers = select_answers_with_no_logit_below_threshold(no_logit, batch_answers, self.q_hats_post_rank)
