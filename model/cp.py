@@ -56,8 +56,6 @@ def batch_data(data_generator, batch_size):
         yield batch, answers
 
 def generate_with_logits(model, tokenizer, batch, temperature=1, max_new_tokens=5):
-    print(batch)
-    print(type(batch))
     inputs = tokenizer(batch, return_tensors='pt', padding=True)
     inputs = {key: value.to(distributed_state.device) for key, value in inputs.items()}  # Ensure inputs are on GPU if available
     
@@ -383,7 +381,7 @@ class ConformalPredictor:
 
         data_inputs = list(zip(batches, batches_answers))
         with distributed_state.split_between_processes(data_inputs, apply_padding=True) as batched_inputs:
-            for batch, batch_answers in batched_inputs:
+            for batch, batch_answers in zip(*batched_inputs):
                 # Here the logits will have shape (max_generation_length, batch_size, vocab_size)
                 generated_text, logits = generate_with_logits(model, tokenizer, batch)
                 first_token_logit = logits[0]
