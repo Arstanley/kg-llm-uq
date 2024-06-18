@@ -53,8 +53,8 @@ def batch_data(input_prompts, input_answers, batch_size):
             answers = []
     return zip(batches, batch_answers)
 
-    if batch:
-        yield batch, answers
+    # if batch:
+    #     yield batch, answers
 
 def generate_with_logits(model, tokenizer, batch, temperature=1, max_new_tokens=5):
     inputs = tokenizer(batch, return_tensors='pt', padding=True)
