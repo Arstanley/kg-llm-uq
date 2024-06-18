@@ -340,7 +340,7 @@ class ConformalPredictor:
     def post_process_answers(self, answers, reasoning_paths, question, rog_paths):
         # def cal_data():
         prompts = []
-        answers = []
+        prompt_answers = []
         for answer in answers:
             reasoning_path = rog_paths + [p for p in reasoning_paths if p.split("->")[-1].lower().strip() == answer.lower().strip()] 
             paths_str = "[" + ",".join(reasoning_path)  + "]"
@@ -359,7 +359,7 @@ class ConformalPredictor:
 
             prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
             prompts.append(prompt)
-            answers.append(answer)
+            prompt_answers.append(answer)
 
             # return prompts, answers
         def select_answers_with_no_logit_below_threshold(no_logit, batch_answers, q_hat):
@@ -371,7 +371,7 @@ class ConformalPredictor:
             return selected_answers
 
         final_answer = []
-        batch_data_generator = list(batch_data(prompts, answers, batch_size=12))
+        batch_data_generator = list(batch_data(prompts, prompt_answers, batch_size=12))
         all_final_answers = []
 
         print(batch_data_generator)
