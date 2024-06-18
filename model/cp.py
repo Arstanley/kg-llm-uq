@@ -360,7 +360,7 @@ class ConformalPredictor:
                 prompts.append(prompt)
                 prompt_answers.append(answer)
 
-            return prompts, answers
+                yield prompts, answers
         def select_answers_with_no_logit_below_threshold(no_logit, batch_answers, q_hat):
             # Ensure no_logit and batch_answers are of the same length
             assert len(no_logit) == len(batch_answers), "no_logit and batch_answers must have the same length"
