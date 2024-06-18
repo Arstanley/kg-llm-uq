@@ -38,12 +38,12 @@ model = LlamaForCausalLM.from_pretrained(
 distributed_state = PartialState()
 model.to(distributed_state.device)
 
-def batch_data(data_generator, batch_size):
+def batch_data(input_prompts, input_answers, batch_size):
     batches = []
     batch_answers = []
     batch = []
     answers = []
-    for sentence, answer in data_generator:
+    for sentence, answer in zip(input_prompts, input_answers):
         batch.append(sentence)
         answers.append(answer)
         if len(batch) == batch_size:
@@ -51,7 +51,7 @@ def batch_data(data_generator, batch_size):
             batch_answers.append(answers)
             batch = []
             answers = []
-    return batches, batch_answers 
+    return zip(batches, batch_answers)
 
     if batch:
         yield batch, answers
@@ -338,30 +338,30 @@ class ConformalPredictor:
 
     
     def post_process_answers(self, answers, reasoning_paths, question, rog_paths):
-        def cal_data():
-            prompts = []
-            answers = []
-            for answer in answers:
-                reasoning_path = rog_paths + [p for p in reasoning_paths if p.split("->")[-1].lower().strip() == answer.lower().strip()] 
-                paths_str = "[" + ",".join(reasoning_path)  + "]"
-                i = 0
+        # def cal_data():
+        prompts = []
+        answers = []
+        for answer in answers:
+            reasoning_path = rog_paths + [p for p in reasoning_paths if p.split("->")[-1].lower().strip() == answer.lower().strip()] 
+            paths_str = "[" + ",".join(reasoning_path)  + "]"
+            i = 0
 
-                system_message = "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe.  Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature. If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information."
-                user_message = f"""Is "{answer}" an answer to "{question}?" given the following reasoning paths: {paths_str} Answer with 'Yes' or 'No' only. DO NOT output anything else."""
-                while len(user_message) > 10000 and i < len(reasoning_path):
-                    path_str = "[" + ','.join(reasoning_path[i:]) + "]"
-                    user_message = f"""Is "{answer}" an answer to "{question}?" given the following reasoning paths: {path_str} Answer with 'Yes' or 'No' only. DO NOT output anything else."""
-                    i += 1
+            system_message = "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe.  Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature. If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information."
+            user_message = f"""Is "{answer}" an answer to "{question}?" given the following reasoning paths: {paths_str} Answer with 'Yes' or 'No' only. DO NOT output anything else."""
+            while len(user_message) > 10000 and i < len(reasoning_path):
+                path_str = "[" + ','.join(reasoning_path[i:]) + "]"
+                user_message = f"""Is "{answer}" an answer to "{question}?" given the following reasoning paths: {path_str} Answer with 'Yes' or 'No' only. DO NOT output anything else."""
+                i += 1
 
-                messages = [
-        {"role": "system", "content": system_message},
-        {"role": "user", "content": user_message}]
+            messages = [
+    {"role": "system", "content": system_message},
+    {"role": "user", "content": user_message}]
 
-                prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
-                prompts.append(prompt)
-                answers.append(answer)
+            prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
+            prompts.append(prompt)
+            answers.append(answer)
 
-            return prompts, answers
+            # return prompts, answers
         def select_answers_with_no_logit_below_threshold(no_logit, batch_answers, q_hat):
             # Ensure no_logit and batch_answers are of the same length
             assert len(no_logit) == len(batch_answers), "no_logit and batch_answers must have the same length"
@@ -371,7 +371,7 @@ class ConformalPredictor:
             return selected_answers
 
         final_answer = []
-        batch_data_generator = batch_data(cal_data(), batch_size=12)
+        batch_data_generator = batch_data(prompts, answers, batch_size=12)
         all_final_answers = []
 
         print(batch_data_generator)
