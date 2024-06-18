@@ -59,8 +59,8 @@ def batch_data(input_prompts, input_answers, batch_size):
 
 def generate_with_logits(model, tokenizer, batch, temperature=1, max_new_tokens=5):
     inputs = tokenizer(batch, return_tensors='pt', padding=True)
-    inputs = {key: accelerator.prepare(value) for key, value in inputs.items()}  # Ensure inputs are on GPU if available
-    print(inputs['input_ids'].device)
+    inputs = {key: value.to(accelerator.device) for key, value in inputs.items()}  # Ensure inputs are on GPU if available
+    
     output = model.generate(
         input_ids=inputs['input_ids'], 
         attention_mask=inputs['attention_mask'], 
