@@ -31,6 +31,7 @@ distributed_state = PartialState()
 
 tokenizer = AutoTokenizer.from_pretrained("meta-llama/Meta-Llama-3-8B-Instruct")
 tokenizer.pad_token = tokenizer.eos_token
+print(distributed_state.device)
 model = LlamaForCausalLM.from_pretrained(
     "meta-llama/Meta-Llama-3-8B-Instruct",
     load_in_8bit=False,
