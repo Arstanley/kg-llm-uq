@@ -8,7 +8,7 @@ from collections import defaultdict
 import random
 import torch
 from accelerate.utils import gather_object
-from accelerate import PartialState
+from acclerate import AccleratorState
 
 from torch.nn.parallel import DistributedDataParallel as DDP
 
@@ -27,7 +27,7 @@ import numpy as np
 # text_generator = pipeline("text-generation", model="meta-llama/Meta-Llama-3-8B-Instruct", batch_size=4, device=0, torch_dtype=torch.float16)
 # text_generator.tokenizer.pad_token_id = text_generator.model.config.eos_token_id
 
-distributed_state = PartialState()
+distributed_state = AccleratorState()
 
 tokenizer = AutoTokenizer.from_pretrained("meta-llama/Meta-Llama-3-8B-Instruct")
 tokenizer.pad_token = tokenizer.eos_token
