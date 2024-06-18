@@ -8,7 +8,7 @@ from collections import defaultdict
 import random
 import torch
 from accelerate.utils import gather_object
-from accelerate import AccleratorState
+from accelerate import AcceleratorState
 
 from torch.nn.parallel import DistributedDataParallel as DDP
 
