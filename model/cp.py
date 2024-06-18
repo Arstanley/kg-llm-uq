@@ -27,15 +27,17 @@ import numpy as np
 # text_generator = pipeline("text-generation", model="meta-llama/Meta-Llama-3-8B-Instruct", batch_size=4, device=0, torch_dtype=torch.float16)
 # text_generator.tokenizer.pad_token_id = text_generator.model.config.eos_token_id
 
+distributed_state = PartialState()
+
 tokenizer = AutoTokenizer.from_pretrained("meta-llama/Meta-Llama-3-8B-Instruct")
 tokenizer.pad_token = tokenizer.eos_token
 model = LlamaForCausalLM.from_pretrained(
     "meta-llama/Meta-Llama-3-8B-Instruct",
     load_in_8bit=False,
-    torch_dtype=torch.float16
+    torch_dtype=torch.float16,
+    device_map=distributed_state.device
 ).bfloat16()
 
-distributed_state = PartialState()
 model.to(distributed_state.device)
 
 def batch_data(input_prompts, input_answers, batch_size):
