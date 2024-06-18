@@ -8,7 +8,7 @@ from collections import defaultdict
 import random
 import torch
 from accelerate.utils import gather_object
-from accelerate import Accelerator
+from accelerate import PartialState
 
 from torch.nn.parallel import DistributedDataParallel as DDP
 
@@ -27,7 +27,7 @@ import numpy as np
 # text_generator = pipeline("text-generation", model="meta-llama/Meta-Llama-3-8B-Instruct", batch_size=4, device=0, torch_dtype=torch.float16)
 # text_generator.tokenizer.pad_token_id = text_generator.model.config.eos_token_id
 
-accelerator = Accelerator()
+distributed_state = PartialState()
 
 tokenizer = AutoTokenizer.from_pretrained("meta-llama/Meta-Llama-3-8B-Instruct")
 tokenizer.pad_token = tokenizer.eos_token
@@ -35,31 +35,29 @@ model = LlamaForCausalLM.from_pretrained(
     "meta-llama/Meta-Llama-3-8B-Instruct",
     load_in_8bit=False,
     torch_dtype=torch.float16,
+    device_map=distributed_state.device
 ).bfloat16()
 
-accelerator.prepare(model)
-
-def batch_data(input_prompts, input_answers, batch_size):
-    batches = []
-    batch_answers = []
+def batch_data(data_generator, batch_size):
+    # batches = []
+    # batch_answers = []
     batch = []
     answers = []
-    for sentence, answer in zip(input_prompts, input_answers):
+    for sentence, answer in data_generator:
         batch.append(sentence)
         answers.append(answer)
         if len(batch) == batch_size:
-            batches.append(batch) 
-            batch_answers.append(answers)
+            yield batch, answers
             batch = []
             answers = []
-    return zip(batches, batch_answers)
+    # return zip(batches, batch_answers)
 
-    # if batch:
-    #     yield batch, answers
+    if batch:
+        yield batch, answers
 
 def generate_with_logits(model, tokenizer, batch, temperature=1, max_new_tokens=5):
     inputs = tokenizer(batch, return_tensors='pt', padding=True)
-    inputs = {key: value.to(accelerator.device) for key, value in inputs.items()}  # Ensure inputs are on GPU if available
+    inputs = {key: value.to(distributed_state.device) for key, value in inputs.items()}  # Ensure inputs are on GPU if available
     
     output = model.generate(
         input_ids=inputs['input_ids'], 
@@ -70,7 +68,7 @@ def generate_with_logits(model, tokenizer, batch, temperature=1, max_new_tokens=
         output_scores=True, 
         return_dict_in_generate=True
     )
-    output = accelerator.gather(output)
+
     generated_tokens = output.sequences
     logits = output['scores']
 
@@ -339,30 +337,30 @@ class ConformalPredictor:
 
     
     def post_process_answers(self, answers, reasoning_paths, question, rog_paths):
-        # def cal_data():
-        prompts = []
-        prompt_answers = []
-        for answer in answers:
-            reasoning_path = rog_paths + [p for p in reasoning_paths if p.split("->")[-1].lower().strip() == answer.lower().strip()] 
-            paths_str = "[" + ",".join(reasoning_path)  + "]"
-            i = 0
+        def cal_data():
+            prompts = []
+            prompt_answers = []
+            for answer in answers:
+                reasoning_path = rog_paths + [p for p in reasoning_paths if p.split("->")[-1].lower().strip() == answer.lower().strip()] 
+                paths_str = "[" + ",".join(reasoning_path)  + "]"
+                i = 0
 
-            system_message = "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe.  Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature. If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information."
-            user_message = f"""Is "{answer}" an answer to "{question}?" given the following reasoning paths: {paths_str} Answer with 'Yes' or 'No' only. DO NOT output anything else."""
-            while len(user_message) > 10000 and i < len(reasoning_path):
-                path_str = "[" + ','.join(reasoning_path[i:]) + "]"
-                user_message = f"""Is "{answer}" an answer to "{question}?" given the following reasoning paths: {path_str} Answer with 'Yes' or 'No' only. DO NOT output anything else."""
-                i += 1
+                system_message = "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe.  Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature. If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information."
+                user_message = f"""Is "{answer}" an answer to "{question}?" given the following reasoning paths: {paths_str} Answer with 'Yes' or 'No' only. DO NOT output anything else."""
+                while len(user_message) > 10000 and i < len(reasoning_path):
+                    path_str = "[" + ','.join(reasoning_path[i:]) + "]"
+                    user_message = f"""Is "{answer}" an answer to "{question}?" given the following reasoning paths: {path_str} Answer with 'Yes' or 'No' only. DO NOT output anything else."""
+                    i += 1
 
-            messages = [
-    {"role": "system", "content": system_message},
-    {"role": "user", "content": user_message}]
+                messages = [
+        {"role": "system", "content": system_message},
+        {"role": "user", "content": user_message}]
 
-            prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
-            prompts.append(prompt)
-            prompt_answers.append(answer)
+                prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
+                prompts.append(prompt)
+                prompt_answers.append(answer)
 
-            # return prompts, answers
+            return prompts, answers
         def select_answers_with_no_logit_below_threshold(no_logit, batch_answers, q_hat):
             # Ensure no_logit and batch_answers are of the same length
             assert len(no_logit) == len(batch_answers), "no_logit and batch_answers must have the same length"
@@ -372,26 +370,32 @@ class ConformalPredictor:
             return selected_answers
 
         final_answer = []
-        batch_data_generator = list(batch_data(prompts, prompt_answers, batch_size=12))
+        batch_data_generator = batch_data(cal_data(), batch_size=32)
         all_final_answers = []
 
-        accelerator.prepare(batch_data_generator)
+        batches = []
+        batches_answers = []
         for batch, batch_answers in batch_data_generator:
-            # Here the logits will have shape (max_generation_length, batch_size, vocab_size)
-            generated_text, logits = generate_with_logits(model, tokenizer, batch)
-            first_token_logit = logits[0]
-            yes_token = tokenizer("Yes")['input_ids'][1]
-            no_token = tokenizer("No")['input_ids'][1]
-            yes_logit = first_token_logit[:, yes_token]
-            no_logit = first_token_logit[:, no_token]
-            print(batch_answers)
-            batch_answers = accelerator.gather(batch_answers)
+            batches.append(batch) 
+            batches_answers.append(batch_answers)
 
-            selected_answers = select_answers_with_no_logit_below_threshold(no_logit, batch_answers, self.q_hats_post_rank)
+        data_inputs = zip(batches, batches_answers)
+        with distributed_state.split_between_processes(data_inputs, applying_padding=True) as batched_inputs:
+            for batch, batch_answers in batched_inputs:
+                # Here the logits will have shape (max_generation_length, batch_size, vocab_size)
+                generated_text, logits = generate_with_logits(model, tokenizer, batch)
+                first_token_logit = logits[0]
+                yes_token = tokenizer("Yes")['input_ids'][1]
+                no_token = tokenizer("No")['input_ids'][1]
+                yes_logit = first_token_logit[:, yes_token]
+                no_logit = first_token_logit[:, no_token]
+                print(batch_answers)
 
-            all_final_answers.append(selected_answers)
+                selected_answers = select_answers_with_no_logit_below_threshold(no_logit, batch_answers, self.q_hats_post_rank)
 
-        print(all_final_answers)
+                all_final_answers.append(selected_answers)
+
+            print(all_final_answers)
         # Gather all the results from all processes
         final_answer = gather_object(all_final_answers)
         return final_answer
