@@ -374,8 +374,6 @@ class ConformalPredictor:
         batch_data_generator = list(batch_data(prompts, prompt_answers, batch_size=12))
         all_final_answers = []
 
-        print(batch_data_generator)
-        print(type(batch_data_generator))
         with distributed_state.split_between_processes(batch_data_generator, apply_padding="True") as batched_data_generator:
             for batch, batch_answers in batched_data_generator:
                 # Here the logits will have shape (max_generation_length, batch_size, vocab_size)
