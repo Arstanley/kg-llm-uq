@@ -368,7 +368,7 @@ class ConformalPredictor:
             return selected_answers
 
         final_answer = []
-        batch_data_generator = batch_data(cal_data(), batch_size=64)
+        batch_data_generator = batch_data(cal_data(), batch_size=32)
         all_final_answers = []
 
         batches = []
