@@ -389,8 +389,8 @@ class ConformalPredictor:
                 no_logit = first_token_logit[:, no_token]
 
                 selected_answers = select_answers_with_no_logit_below_threshold(no_logit, batch_answers, self.q_hats_post_rank)
-
-                all_final_answers.append(selected_answers)
+                
+                all_final_answers.append(gather_object(selected_answers))
         # Gather all the results from all processes
         final_answer = gather_object(all_final_answers)
         print(final_answer)
