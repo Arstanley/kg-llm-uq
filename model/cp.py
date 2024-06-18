@@ -39,15 +39,19 @@ distributed_state = PartialState()
 model.to(distributed_state.device)
 
 def batch_data(data_generator, batch_size):
+    batches = []
+    batch_answers = []
     batch = []
     answers = []
     for sentence, answer in data_generator:
         batch.append(sentence)
         answers.append(answer)
         if len(batch) == batch_size:
-            yield batch, answers
+            batches.append(batch) 
+            batch_answers.append(answers)
             batch = []
             answers = []
+    return batches, batch_answers 
     if batch:
         yield batch, answers
 
@@ -334,6 +338,8 @@ class ConformalPredictor:
     
     def post_process_answers(self, answers, reasoning_paths, question, rog_paths):
         def cal_data():
+            prompts = []
+            answers = []
             for answer in answers:
                 reasoning_path = rog_paths + [p for p in reasoning_paths if p.split("->")[-1].lower().strip() == answer.lower().strip()] 
                 paths_str = "[" + ",".join(reasoning_path)  + "]"
@@ -351,8 +357,10 @@ class ConformalPredictor:
         {"role": "user", "content": user_message}]
 
                 prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
+                prompts.append(prompt)
+                answers.append(answer)
 
-                yield prompt, answer 
+            return prompts, answers
         def select_answers_with_no_logit_below_threshold(no_logit, batch_answers, q_hat):
             # Ensure no_logit and batch_answers are of the same length
             assert len(no_logit) == len(batch_answers), "no_logit and batch_answers must have the same length"
