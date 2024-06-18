@@ -371,7 +371,7 @@ class ConformalPredictor:
             return selected_answers
 
         final_answer = []
-        batch_data_generator = batch_data(prompts, answers, batch_size=12)
+        batch_data_generator = list(batch_data(prompts, answers, batch_size=12))
         all_final_answers = []
 
         print(batch_data_generator)
