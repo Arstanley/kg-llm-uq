@@ -28,8 +28,6 @@ import numpy as np
 # text_generator.tokenizer.pad_token_id = text_generator.model.config.eos_token_id
 
 accelerator = Accelerator()
-print(torch.cuda.is_available())
-print(accelerator.device)
 
 tokenizer = AutoTokenizer.from_pretrained("meta-llama/Meta-Llama-3-8B-Instruct")
 tokenizer.pad_token = tokenizer.eos_token
@@ -61,8 +59,7 @@ def batch_data(input_prompts, input_answers, batch_size):
 
 def generate_with_logits(model, tokenizer, batch, temperature=1, max_new_tokens=5):
     inputs = tokenizer(batch, return_tensors='pt', padding=True)
-    print(inputs.device)
-    accelerator.prepare(inputs)
+    accelerator.prepare(inputs['input_ids'], inputs['attention_mask'])
     # inputs = {key: value.to(distributed_state.device) for key, value in inputs.items()}  # Ensure inputs are on GPU if available
     output = model.generate(
         input_ids=inputs['input_ids'], 
