@@ -392,7 +392,7 @@ class ConformalPredictor:
                 
                 all_final_answers.append(gather_object(selected_answers))
         # Gather all the results from all processes
-        final_answer = gather_object(all_final_answers)
+        final_answer = list(set(a for alist in all_final_answers for a in alist))
         print(final_answer)
         return final_answer
 
