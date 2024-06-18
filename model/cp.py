@@ -368,7 +368,7 @@ class ConformalPredictor:
             return selected_answers
 
         final_answer = []
-        batch_data_generator = batch_data(cal_data(), batch_size=16)
+        batch_data_generator = batch_data(cal_data(), batch_size=24)
         all_final_answers = []
 
         batches = []
@@ -393,6 +393,7 @@ class ConformalPredictor:
                 all_final_answers.append(selected_answers)
         # Gather all the results from all processes
         final_answer = gather_object(all_final_answers)
+        print(final_answer)
         return final_answer
 
     def calculate_score(self, tgt_sentences, cur_sentence):
