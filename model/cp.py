@@ -368,7 +368,7 @@ class ConformalPredictor:
             return selected_answers
 
         final_answer = []
-        batch_data_generator = batch_data(cal_data(), batch_size=32)
+        batch_data_generator = batch_data(cal_data(), batch_size=64)
         all_final_answers = []
 
         batches = []
@@ -380,8 +380,6 @@ class ConformalPredictor:
         data_inputs = list(zip(batches, batches_answers))
         with distributed_state.split_between_processes(data_inputs, apply_padding=True) as batched_inputs:
             for batch, batch_answers in batched_inputs:
-                print(batch)
-                print(batch_answers)
                 # Here the logits will have shape (max_generation_length, batch_size, vocab_size)
                 generated_text, logits = generate_with_logits(model, tokenizer, batch)
                 first_token_logit = logits[0]
@@ -389,13 +387,10 @@ class ConformalPredictor:
                 no_token = tokenizer("No")['input_ids'][1]
                 yes_logit = first_token_logit[:, yes_token]
                 no_logit = first_token_logit[:, no_token]
-                print(batch_answers)
 
                 selected_answers = select_answers_with_no_logit_below_threshold(no_logit, batch_answers, self.q_hats_post_rank)
 
                 all_final_answers.append(selected_answers)
-
-            print(all_final_answers)
         # Gather all the results from all processes
         final_answer = gather_object(all_final_answers)
         return final_answer
