@@ -56,6 +56,8 @@ def batch_data(data_generator, batch_size):
         yield batch, answers
 
 def generate_with_logits(model, tokenizer, batch, temperature=1, max_new_tokens=5):
+    print(batch)
+    print(type(batch))
     inputs = tokenizer(batch, return_tensors='pt', padding=True)
     inputs = {key: value.to(distributed_state.device) for key, value in inputs.items()}  # Ensure inputs are on GPU if available
     
