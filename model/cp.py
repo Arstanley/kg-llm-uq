@@ -28,6 +28,7 @@ import numpy as np
 # text_generator.tokenizer.pad_token_id = text_generator.model.config.eos_token_id
 
 accelerator = Accelerator()
+print(torch.cuda.is_available())
 print(accelerator.device)
 
 tokenizer = AutoTokenizer.from_pretrained("meta-llama/Meta-Llama-3-8B-Instruct")
