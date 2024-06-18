@@ -378,6 +378,8 @@ class ConformalPredictor:
             batches_answers.append(batch_answers)
 
         data_inputs = list(zip(batches, batches_answers))
+        if len(data_inputs) == 0:
+            return []
         with distributed_state.split_between_processes(data_inputs, apply_padding=True) as batched_inputs:
             for batch, batch_answers in batched_inputs:
                 # Here the logits will have shape (max_generation_length, batch_size, vocab_size)
