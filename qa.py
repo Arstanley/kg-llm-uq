@@ -143,7 +143,7 @@ def main():
         p_values[i] = (current_p_values, combination)
 
         with open(p_values_path, "w") as f:
-            json.dump(p_values)
+            json.dump(p_values, f)
         
     p_values = np.array(p_values)
 
