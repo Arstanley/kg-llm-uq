@@ -124,27 +124,26 @@ def main():
     
     # Load p_values from disk if it exists, otherwise calculate it and save it
     p_values_path = f"./p_values_{args.dataset_name}.json"
+
+    p_values = {}
     if os.path.isfile(p_values_path):
         with open(p_values_path, "r") as f:
-            p_values_tmp = json.load(f)
-        p_values = np.array(p_values_tmp["p_values"])
-        combinations_idx = p_values_tmp["combinations_idx"]
+            p_values = json.load(f)
+        combinations_idx = len(p_values)
     else:
-        p_values = [] # This will be a 2d array, each row will be the p_values for a combination. We include every epsilon in the p_values.
+        # p_values = [] # This will be a 2d array, each row will be the p_values for a combination. We include every epsilon in the p_values.
         combinations_idx = 0
         
-    for combination in tqdm(combinations[combinations_idx:]):
+    for i, combination in enumerate(tqdm(combinations[combinations_idx:])):
         alpha1 = combination[0]
         alpha2 = combination[1]
         alpha3 = combination[2]
 
         current_p_values = get_p_values(combination, cp_model, caliberation_dataset.select(range(150)), epsilons, fout) 
-        p_values.append(current_p_values)
-        
+        p_values[i] = (current_p_values, combination)
+
         with open(p_values_path, "w") as f:
-            json.dump({"p_values": p_values, "combinations_idx": combinations_idx}, f)
-        
-        combinations_idx += 1
+            json.dump(p_values)
         
     p_values = np.array(p_values)
 
