@@ -142,7 +142,7 @@ def main():
         p_values.append(current_p_values)
         
         with open(p_values_path, "w") as f:
-            json.dump({"p_values": p_values.tolist(), "combinations_idx": combinations_idx}, f)
+            json.dump({"p_values": p_values, "combinations_idx": combinations_idx}, f)
         
         combinations_idx += 1
         
