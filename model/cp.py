@@ -194,14 +194,6 @@ class ConformalPredictor:
             else:
                 self.path_scores, self.ans_scores, self.post_rank_score = self.calculate_scores()
 
-
-    def set_alpha(self, alpha):
-        """
-            Set alpha. The reason that we have this is because sometimes we load the model 
-            directly from pickled object and would like to change the confidence level 
-        """
-        self.alpha = alpha
-    
     def create_tgt_sentences(self, neighbors, g, node, parent=None):
         """Helper function - create neighbors for string matching based on different mode
         
