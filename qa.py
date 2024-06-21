@@ -115,9 +115,9 @@ def main():
     #     run_dataset = test_dataset
 
     # 1 ) Get the search space for the alphas 
-    alpha1 = np.arange(0.1, 1, 0.3)
-    alpha2 = np.arange(0.1, 1, 0.2)
-    alpha3 = np.arange(0.1, 1, 0.1)
+    alpha1 = np.arange(0.5, 1, 0.3)
+    alpha2 = np.arange(0.5, 1, 0.2)
+    alpha3 = np.arange(0.5, 1, 0.1)
     search_spaces = {"alpha1": alpha1, "alpha2": alpha2, "alpha3": alpha3}
     combinations = list(product(*search_spaces.values()))
     print("Alpha Space: ", len(combinations))
