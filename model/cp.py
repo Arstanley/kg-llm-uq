@@ -125,8 +125,8 @@ class ConformalPredictor:
     def set_alpha(self, alphas):
         self.alphas = alphas
         self.path_alpha = self.alphas[0]
-        self.ans_alpha = self.alpha[1]
-        self.post_alpha = self.alpha[2]
+        self.ans_alpha = self.alphas[1]
+        self.post_alpha = self.alphas[2]
 
         self.q_hats = [np.quantile(self.path_scores[ii], ((len(self.path_scores[ii]) + 1) * (1 - self.path_alpha)) / len(self.path_scores[ii])) for ii in range(self.max_hop)]
         self.q_hats_a = np.quantile(self.ans_scores, ((len(self.ans_scores) + 1) * (1 - self.ans_alpha)) / len(self.ans_scores))
