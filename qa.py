@@ -135,7 +135,7 @@ def main():
         combinations_idx = 0
         
     for i, combination in enumerate(tqdm(combinations[combinations_idx:])):
-        combination = [0.1, 0.1, 0.5]
+        combination = [0.5, 0.5, 0.5]
         alpha1 = combination[0]
         alpha2 = combination[1]
         alpha3 = combination[2]
