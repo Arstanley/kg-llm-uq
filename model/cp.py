@@ -503,7 +503,7 @@ class ConformalPredictor:
             # logits is of shape (max_len, len(a_entities) aka batch size, vocab_size)
             no_token = tokenizer("No")['input_ids'][1]
             
-            no_logit = logits[0, :, no_token]
+            no_logit = logits[0][:, no_token]
             scores_candidate.extend(no_logit.tolist())
 
         self.max_hop = len(scores_path) if len(scores_path) < self.max_hop else self.max_hop
