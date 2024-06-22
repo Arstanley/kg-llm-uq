@@ -131,6 +131,8 @@ class ConformalPredictor:
         self.q_hats = [np.quantile(self.path_scores[ii], ((len(self.path_scores[ii]) + 1) * (1 - self.path_alpha)) / len(self.path_scores[ii])) for ii in range(self.max_hop)]
         self.q_hats_a = np.quantile(self.ans_scores, ((len(self.ans_scores) + 1) * (1 - self.ans_alpha)) / len(self.ans_scores))
         self.q_hats_post_rank = np.quantile(self.post_rank_score, ((len(self.post_rank_score) + 1) * (1 - self.post_alpha)) / len(self.post_rank_score))
+        print(self.q_hats_a)
+        print(self.q_hats_post_rank)
 
     def calculate_alpha(self, alpha): 
         if self.dataset=='webqsp':
@@ -237,6 +239,9 @@ class ConformalPredictor:
         return final_answer 
     
     def retrieve_candidates(self, q_entities, g, question, question_id):
+
+        print(self.q_hats_a)
+        print(self.q_hats_post_rank)
         reasoning_paths = []
         answers = set()
 
@@ -389,7 +394,6 @@ class ConformalPredictor:
                 all_final_answers.append(gather_object(selected_answers))
         # Gather all the results from all processes
         final_answer = list(set(a for alist in all_final_answers for a in alist))
-        print(final_answer)
         return final_answer
 
     def calculate_score(self, tgt_sentences, cur_sentence):

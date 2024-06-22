@@ -201,7 +201,6 @@ def run_cp_model_on_dataset(dataset, cp_model, fout):
         
         try:
             final_answers = cp_model.predict(q_entity, graph, question, question_id)
-            print(final_answers)
 
             # Create dict to store prediction
             res = {"id": data['id'], "question": question, "final_answers": final_answers, "a_entity": a_entity}
