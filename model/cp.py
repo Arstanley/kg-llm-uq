@@ -123,10 +123,15 @@ class ConformalPredictor:
         self.q_hats_post_rank = np.quantile(self.post_rank_score, ((len(self.post_rank_score) + 1) * (1 - self.post_alpha)) / len(self.post_rank_score))
 
     def set_alpha(self, alphas):
+        print("setting alphas to ", alphas)
         self.alphas = alphas
         self.path_alpha = self.alphas[0]
         self.ans_alpha = self.alphas[1]
         self.post_alpha = self.alphas[2]
+
+        print(self.path_alpha)
+        print(self.ans_alpha)
+        print(self.post_alpha)
 
         self.q_hats = [np.quantile(self.path_scores[ii], ((len(self.path_scores[ii]) + 1) * (1 - self.path_alpha)) / len(self.path_scores[ii])) for ii in range(self.max_hop)]
         self.q_hats_a = np.quantile(self.ans_scores, ((len(self.ans_scores) + 1) * (1 - self.ans_alpha)) / len(self.ans_scores))
@@ -239,6 +244,8 @@ class ConformalPredictor:
     def retrieve_candidates(self, q_entities, g, question, question_id):
         reasoning_paths = []
         answers = set()
+
+        print(self.alphas)
 
         masked_question = question
         for q_e in q_entities:

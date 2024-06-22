@@ -229,7 +229,6 @@ def get_p_values(configuration, cp_model, calibration_set, epsilon, fout):
     cp_model.set_alpha(configuration)
     _, _, hits_at_1 = run_cp_model_on_dataset(calibration_set, cp_model, fout)
     R = (len(calibration_set) - hits_at_1) # Risk level
-    print(R, len(calibration_set), epsilon)
 
     p_values = [] 
     for epsilon in epsilons:
