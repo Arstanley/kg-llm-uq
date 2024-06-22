@@ -66,11 +66,12 @@ def generate_with_logits(model, tokenizer, batch, temperature=1, max_new_tokens=
         max_new_tokens=max_new_tokens, 
         num_return_sequences=1, 
         output_scores=True, 
+        output_logits=True,
         return_dict_in_generate=True
     )
 
     generated_tokens = output.sequences
-    logits = output['scores']
+    logits = output['logits']
 
     generated_texts = [tokenizer.decode(tokens, skip_special_tokens=True) for tokens in generated_tokens]
     return generated_texts, logits 
@@ -110,8 +111,6 @@ class ConformalPredictor:
         self.ans_alpha = self.alphas[1]
         self.post_alpha = self.alphas[2]
 
-        print(self.path_alpha)
-
         # self.alpha, self.path_alpha = self.calculate_alpha(alpha)
         self.pattern = r'(m\.\d+|g\.\d+)'
         self.encoding_method = encoding_method
@@ -131,8 +130,6 @@ class ConformalPredictor:
         self.q_hats = [np.quantile(self.path_scores[ii], ((len(self.path_scores[ii]) + 1) * (1 - self.path_alpha)) / len(self.path_scores[ii])) for ii in range(self.max_hop)]
         self.q_hats_a = np.quantile(self.ans_scores, ((len(self.ans_scores) + 1) * (1 - self.ans_alpha)) / len(self.ans_scores))
         self.q_hats_post_rank = np.quantile(self.post_rank_score, ((len(self.post_rank_score) + 1) * (1 - self.post_alpha)) / len(self.post_rank_score))
-        print(self.q_hats_a)
-        print(self.q_hats_post_rank)
 
     def calculate_alpha(self, alpha): 
         if self.dataset=='webqsp':
