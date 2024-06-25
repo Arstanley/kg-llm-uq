@@ -74,7 +74,7 @@ def generate_with_logits(model, tokenizer, batch, temperature=1, max_new_tokens=
     logits = output['logits']
 
     generated_texts = [tokenizer.decode(tokens, skip_special_tokens=True) for tokens in generated_tokens]
-    return generated_texts, logits 
+    return generated_texts, -logits 
 
 class ConformalPredictor:
     """
@@ -462,7 +462,6 @@ class ConformalPredictor:
                             score = self.calculate_pairwise_score(masked_question + "? ", r)
                         else:
                             # answer = self.llm_agent.request_information(question, None)
-                            print(hop0answer, f'({s}, {r}, {t})')
                             score = self.calculate_pairwise_score(hop0answer, f'({s}, {r}, {t})')
                         scores_path[hop_idx].append(score.item())
                     else:
