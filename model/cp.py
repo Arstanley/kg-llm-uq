@@ -183,9 +183,9 @@ class ConformalPredictor:
             else:
                 self.path_scores, self.ans_scores, self.post_rank_score = self.calculate_scores()
         else:
-            scores_path = f'/home/bo/Dropbox/Projects/kg-llm-uq/calibrated_scores/{self.dataset}_False_scores_path_rog.pkl'
-            scores_a = f'/home/bo/Dropbox/Projects/kg-llm-uq/calibrated_scores/{self.dataset}_False_scores_a_rog.pkl'
-            scores_candidate = f'/home/bo/Dropbox/Projects/kg-llm-uq/calibrated_scores/{self.dataset}_False_scores_candidate_rog.pkl'
+            scores_path = f'/home/bo/Dropbox/Projects/kg-llm-uq/calibrated_scores/{self.dataset}_scores_path_rog.pkl'
+            scores_a = f'/home/bo/Dropbox/Projects/kg-llm-uq/calibrated_scores/{self.dataset}_scores_a_rog.pkl'
+            scores_candidate = f'/home/bo/Dropbox/Projects/kg-llm-uq/calibrated_scores/{self.dataset}_scores_candidate_rog.pkl'
             if (os.path.isfile(scores_path) and os.path.isfile(scores_a) and os.path.isfile(scores_candidate)):
                 self.path_scores = pkl.load(open(scores_path, 'rb'))
                 self.ans_scores = pkl.load(open(scores_a, 'rb'))
