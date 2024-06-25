@@ -74,7 +74,7 @@ def generate_with_logits(model, tokenizer, batch, temperature=1, max_new_tokens=
     logits = output['logits']
 
     generated_texts = [tokenizer.decode(tokens, skip_special_tokens=True) for tokens in generated_tokens]
-    return generated_texts, -logits 
+    return generated_texts, logits 
 
 class ConformalPredictor:
     """
