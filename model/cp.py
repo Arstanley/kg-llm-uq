@@ -384,7 +384,7 @@ class ConformalPredictor:
                 yes_token = tokenizer("Yes")['input_ids'][1]
                 no_token = tokenizer("No")['input_ids'][1]
                 yes_logit = first_token_logit[:, yes_token]
-                no_logit = first_token_logit[:, no_token]
+                no_logit = -first_token_logit[:, no_token]
 
                 selected_answers = select_answers_with_no_logit_below_threshold(no_logit, batch_answers, self.q_hats_post_rank)
                 
@@ -502,7 +502,7 @@ class ConformalPredictor:
             # logits is of shape (max_len, len(a_entities) aka batch size, vocab_size)
             no_token = tokenizer("No")['input_ids'][1]
             
-            no_logit = logits[0][:, no_token]
+            no_logit = -logits[0][:, no_token]
             scores_candidate.extend(no_logit.tolist())
 
         self.max_hop = len(scores_path) if len(scores_path) < self.max_hop else self.max_hop
