@@ -11,6 +11,7 @@ from accelerate.utils import gather_object
 from accelerate import PartialState
 
 from torch.nn.parallel import DistributedDataParallel as DDP
+import torch.nn.functional as F
 
 from sentence_transformers import SentenceTransformer
 sys.path.append(os.path.dirname(os.path.realpath(__file__)) + "/..")
@@ -29,7 +30,7 @@ import numpy as np
 
 distributed_state = PartialState()
 
-tokenizer = AutoTokenizer.from_pretrained("meta-llama/Meta-Llama-3-8B-Instruct")
+tokenizer = AutoTokenizer.from_pretrained("meta-llama/Meta-Llama-3-8B-Instruct", padding_side='left')
 tokenizer.pad_token = tokenizer.eos_token
 model = LlamaForCausalLM.from_pretrained(
     "meta-llama/Meta-Llama-3-8B-Instruct",
@@ -58,7 +59,6 @@ def batch_data(data_generator, batch_size):
 def generate_with_logits(model, tokenizer, batch, temperature=1, max_new_tokens=5):
     inputs = tokenizer(batch, return_tensors='pt', padding=True)
     inputs = {key: value.to(distributed_state.device) for key, value in inputs.items()}  # Ensure inputs are on GPU if available
-    
     output = model.generate(
         input_ids=inputs['input_ids'], 
         attention_mask=inputs['attention_mask'], 
@@ -67,11 +67,13 @@ def generate_with_logits(model, tokenizer, batch, temperature=1, max_new_tokens=
         num_return_sequences=1, 
         output_scores=True, 
         output_logits=True,
-        return_dict_in_generate=True
+        return_dict_in_generate=True,
+        pad_token_id=tokenizer.eos_token_id
     )
 
     generated_tokens = output.sequences
-    logits = output['logits']
+    logits = output.logits
+    scores = output.scores
 
     generated_texts = [tokenizer.decode(tokens, skip_special_tokens=True) for tokens in generated_tokens]
     return generated_texts, logits 
@@ -111,7 +113,7 @@ class ConformalPredictor:
         self.ans_alpha = self.alphas[1]
         self.post_alpha = self.alphas[2]
 
-        # self.alpha, self.path_alpha = self.calculate_alpha(alpha)
+        # self.alpha, self.path_alpha = self.c, Conversationalculate_alpha(alpha)
         self.pattern = r'(m\.\d+|g\.\d+)'
         self.encoding_method = encoding_method
         self.rog_predictions_train, self.rog_predictions_test = self._rog_predictions(self.dataset)
@@ -126,8 +128,6 @@ class ConformalPredictor:
         self.path_alpha = self.alphas[0]
         self.ans_alpha = self.alphas[1]
         self.post_alpha = self.alphas[2]
-
-        print(self.ans_scores)
 
         self.q_hats = [np.quantile(self.path_scores[ii], ((len(self.path_scores[ii]) + 1) * (1 - self.path_alpha)) / len(self.path_scores[ii])) for ii in range(self.max_hop)]
         self.q_hats_a = np.quantile(self.ans_scores, ((len(self.ans_scores) + 1) * (1 - self.ans_alpha)) / len(self.ans_scores))
@@ -239,12 +239,8 @@ class ConformalPredictor:
     
     def retrieve_candidates(self, q_entities, g, question, question_id):
 
-        print(self.q_hats_a)
-        print(self.q_hats_post_rank)
         reasoning_paths = []
         answers = set()
-
-        print(self.alphas)
 
         masked_question = question
         for q_e in q_entities:
@@ -341,11 +337,10 @@ class ConformalPredictor:
             for answer in answers:
                 reasoning_path = rog_paths + [p for p in reasoning_paths if p.split("->")[-1].lower().strip() == answer.lower().strip()] 
                 paths_str = "[" + ",".join(reasoning_path)  + "]"
-                i = 0
-
                 system_message = "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe.  Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature. If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information."
                 user_message = f"""Is "{answer}" an answer to "{question}?" given the following reasoning paths: {paths_str} Answer with 'Yes' or 'No' only. DO NOT output anything else."""
-                while len(user_message) > 10000 and i < len(reasoning_path):
+                i = 0
+                while len(user_message) > 1000 and i < len(reasoning_path):
                     path_str = "[" + ','.join(reasoning_path[i:]) + "]"
                     user_message = f"""Is "{answer}" an answer to "{question}?" given the following reasoning paths: {path_str} Answer with 'Yes' or 'No' only. DO NOT output anything else."""
                     i += 1
@@ -366,32 +361,38 @@ class ConformalPredictor:
             return selected_answers
 
         final_answer = []
-        batch_data_generator = batch_data(cal_data(), batch_size=8)
+        batch_data_generator = batch_data(cal_data(), batch_size=4)
         all_final_answers = []
 
-        batches = []
-        batches_answers = []
+        # batches = []
+        # batches_answers = []
+        # # for batch, batch_answers in batch_data_generator:
+        #     batches.append(batch) 
+        #     batches_answers.append(batch_answers)
+
+        # data_inputs = list(zip(batches, batches_answers))
+        # if len(data_inputs) == 0:
+        #     return []
+        # with distributed_state.split_between_processes(data_inputs, apply_padding=True) as batched_inputs:
         for batch, batch_answers in batch_data_generator:
-            batches.append(batch) 
-            batches_answers.append(batch_answers)
+            # Here the logits will have shape (max_generation_length, batch_size, vocab_size)
+            generated_text, logits = generate_with_logits(model, tokenizer, batch)
+            first_token_logit = logits[0]
+            yes_token = tokenizer("Yes")['input_ids'][1]
+            no_token = tokenizer("No")['input_ids'][1]
 
-        data_inputs = list(zip(batches, batches_answers))
-        if len(data_inputs) == 0:
-            return []
-        with distributed_state.split_between_processes(data_inputs, apply_padding=True) as batched_inputs:
-            for batch, batch_answers in batched_inputs:
-                # Here the logits will have shape (max_generation_length, batch_size, vocab_size)
-                generated_text, logits = generate_with_logits(model, tokenizer, batch)
-                first_token_logit = logits[0]
-                yes_token = tokenizer("Yes")['input_ids'][1]
-                no_token = tokenizer("No")['input_ids'][1]
-                yes_logit = first_token_logit[:, yes_token]
-                no_logit = -first_token_logit[:, no_token]
+            yes_logit = first_token_logit[:, yes_token].unsqueeze(1) # yes_logit will have size (batch_size)
+            no_logit = first_token_logit[:, no_token].unsqueeze(1)
 
-                selected_answers = select_answers_with_no_logit_below_threshold(no_logit, batch_answers, self.q_hats_post_rank)
-                
-                all_final_answers.append(gather_object(selected_answers))
-        # Gather all the results from all processes
+            logits = torch.cat((yes_logit, no_logit), dim=1)
+
+            probs = F.softmax(logits, dim=1) # Shape: (batch_size, 2) 
+            no_logit = probs[:, 1]
+
+            selected_answers = select_answers_with_no_logit_below_threshold(no_logit, batch_answers, self.q_hats_post_rank)
+            
+            all_final_answers.append(selected_answers)
+    # Gather all the results from all processes
         final_answer = list(set(a for alist in all_final_answers for a in alist))
         return final_answer
 
@@ -499,13 +500,44 @@ class ConformalPredictor:
 
             # In additional to the gt paths, let's also add the predicted paths from ROG for better claibration
 
-            # Now, we will use the pre-trained llm as the logit calculator 
-            _, logits = generate_with_logits(model, tokenizer, a_entities)
-            # logits is of shape (max_len, len(a_entities) aka batch size, vocab_size)
-            no_token = tokenizer("No")['input_ids'][1]
+            def cal_data():
+                # prompts = []
+                # prompt_answers = []
+                for answer in a_entities:
+                    reasoning_path = list_of_gt_paths + [p for p in list_of_gt_paths if p.split("->")[-1].lower().strip() == answer.lower().strip()] 
+                    paths_str = "[" + ",".join(reasoning_path)  + "]"
+                    system_message = "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe.  Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature. If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information."
+                    user_message = f"""Is "{answer}" an answer to "{question}?" given the following reasoning paths: {paths_str} Answer with 'Yes' or 'No' only. DO NOT output anything else."""
+                    i = 0
+                    while len(user_message) > 1200 and i < len(reasoning_path):
+                        path_str = "[" + ','.join(reasoning_path[i:]) + "]"
+                        user_message = f"""Is "{answer}" an answer to "{question}?" given the following reasoning paths: {path_str} Answer with 'Yes' or 'No' only. DO NOT output anything else."""
+                        i += 1
+
+                    messages = [
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": user_message}]
+
+                    prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
+
+                    yield prompt, answer
+                # Now, we will use the pre-trained llm as the logit calculator 
             
-            no_logit = -logits[0][:, no_token]
-            scores_candidate.extend(no_logit.tolist())
+            batch_data_generator = batch_data(cal_data(), batch_size=4)
+            for batch, batch_answers in batch_data_generator:
+                texts, logits = generate_with_logits(model, tokenizer, batch)
+                # logits is of shape (max_len, len(a_entities) aka batch size, vocab_size)
+                no_token = tokenizer("No")['input_ids'][1]
+                yes_token = tokenizer("Yes")['input_ids'][1]
+
+                no_logit = logits[0][:, no_token].unsqueeze(1)
+                yes_logit = logits[0][:, yes_token].unsqueeze(1)
+                logits = torch.cat((yes_logit, no_logit), dim=1)
+
+                probs = F.softmax(logits, dim=1) # Shape: (batch_size, 2) 
+                no_logit = probs[:, 1]
+
+                scores_candidate.extend(no_logit.tolist())
 
         self.max_hop = len(scores_path) if len(scores_path) < self.max_hop else self.max_hop
         if self.calibrate_with_reasoing_paths == False:

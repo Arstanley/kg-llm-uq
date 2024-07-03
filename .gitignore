@@ -1,4 +1,3 @@
-calibrated_scores_legacy/
 *conflicted*
 legacy/
 *.out
@@ -8,4 +7,5 @@ train.hf/
 train_webqsp_0.1.hf
 *.pkl
 /saved_models
+/baselines
 /results

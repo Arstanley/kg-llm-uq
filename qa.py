@@ -89,7 +89,7 @@ def main():
     if args.prune == True:
         llm_pruner = LLMAgentForRelationPruning("meta-llama/Llama-2-7b-chat-hf", device="cuda", lora_weights=args.lora_weights_pruner, pre_trained=True)  
     # if args.llm_ranker == True:
-        # llm_ranker = LLMAgentForPostProcessRanking("meta-llama/Meta-Llama-3-8B-Instruct", device="cuda", lora_weights=args.lora_weights_ranker, pre_trained=args.llm_ranker_pretrained)
+    #     llm_ranker = LLMAgentForPostProcessRanking("meta-llama/Meta-Llama-3-8B-Instruct", device="cuda", lora_weights=args.lora_weights_ranker, pre_trained=args.llm_ranker_pretrained)
     # Initialize LLM model
     if args.generation_method == "llm":
         llm_agent = LLMAgentForGraphTraversal("meta-llama/Llama-2-7b-chat-hf", device='cuda', lora_weights=args.lora_weights, pre_trained=args.pre_trained)
@@ -133,9 +133,8 @@ def main():
     else:
         # p_values = [] # This will be a 2d array, each row will be the p_values for a combination. We include every epsilon in the p_values.
         combinations_idx = 0
-        
+    print(combinations_idx) 
     for i, combination in enumerate(tqdm(combinations[combinations_idx:])):
-        combination = [0.1, 0.1, 0.1]
         alpha1 = combination[0]
         alpha2 = combination[1]
         alpha3 = combination[2]
